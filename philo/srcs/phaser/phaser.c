@@ -16,6 +16,7 @@ void	clean_all(t_table *table, int i)
 {
 	pthread_mutex_destroy(&table->monitor);
 	pthread_mutex_destroy(&table->print);
+	pthread_mutex_destroy(&table->lock);
 	while (i < table->amount)
 	{
 		pthread_mutex_destroy(&table->fork[i]);

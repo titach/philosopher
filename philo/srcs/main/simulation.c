@@ -12,62 +12,132 @@
 
 #include "philo.h"
 
-void	dying(t_philo *philo)
+void ft_usleep(long milliseconds)
 {
-	pthread_mutex_lock(&philo->table->print);
-	printf(BCYN"%ld\t%d is checked\n"reset, current_milliseconds() - philo->table->time_start, philo->id);
-	pthread_mutex_unlock(&philo->table->print);
-	if (current_milliseconds() - philo->table->time_start > philo->next_eat / 100)
-		printf(BRED"%ld\t1 died\n"reset, philo->table->t_die / 1000 + 1);
+	long start = current_milliseconds();
+
+	while ((current_milliseconds() - start) < milliseconds)
+		usleep(100);
 }
 
-void	sleeping(t_philo *philo)
+int	dying(t_philo *philo)
 {
+	if (philo->table->end == false)
+		return (1);
 	pthread_mutex_lock(&philo->table->print);
-	printf("%ld\t%d is sleeping\n", current_milliseconds() - philo->table->time_start, philo->id);
+	long	t_cur = current_milliseconds() - philo->table->time_start;
+	long	n_cur = philo->next_eat / 1000;
+	// printf(BCYN"%ld\t%d is checked[%ld]\n"reset, t_cur, philo->id, philo->next_eat / 1000);
 	pthread_mutex_unlock(&philo->table->print);
-	usleep(philo->table->t_sleep);
+	if (t_cur > n_cur)
+	{
+		pthread_mutex_lock(&philo->table->print);
+		printf(BRED"%ld\t%d died\n"reset, philo->table->t_die / 1000 + 1, philo->id);
+		pthread_mutex_unlock(&philo->table->print);
+		// pthread_mutex_lock(&philo->table->lock);
+		philo->table->end = false;
+		// pthread_mutex_unlock(&philo->table->lock);
+		return (1);
+	}
+	return (0);
 }
 
-void	eating(t_philo *philo)
+int	thinking(t_philo *philo)
+{
+	int	check;
+
+	pthread_mutex_lock(&philo->table->lock);
+	check = dying(philo);
+	pthread_mutex_unlock(&philo->table->lock);
+	if (check == 1)
+		return (1);
+	pthread_mutex_lock(&philo->table->print);
+	printf(GRN"%ld\t%d is thinking\n"reset, current_milliseconds() - philo->table->time_start, philo->id);
+	pthread_mutex_unlock(&philo->table->print);
+	return (0);
+}
+
+int	sleeping(t_philo *philo)
+{
+	int	check;
+
+	pthread_mutex_lock(&philo->table->lock);
+	check = dying(philo);
+	pthread_mutex_unlock(&philo->table->lock);
+	if (check == 1)
+		return (1);
+	pthread_mutex_lock(&philo->table->print);
+	printf(BLU"%ld\t%d is sleeping\n"reset, current_milliseconds() - philo->table->time_start, philo->id);
+	pthread_mutex_unlock(&philo->table->print);
+	ft_usleep(philo->table->t_sleep / 1000);
+	return (0);
+}
+
+int	take_forks(t_philo *philo, int first, int second)
+{
+	int	check;
+
+	pthread_mutex_lock(&philo->table->fork[first]);
+	pthread_mutex_lock(&philo->table->fork[second]);
+	pthread_mutex_lock(&philo->table->lock);
+	check = dying(philo);
+	pthread_mutex_unlock(&philo->table->lock);
+	if (check == 1)
+	{
+		pthread_mutex_unlock(&philo->table->fork[first]);
+		pthread_mutex_unlock(&philo->table->fork[second]);
+		return (1);
+	}
+	pthread_mutex_lock(&philo->table->print);
+	printf("%ld\t%d has taken a fork\n", current_milliseconds() - philo->table->time_start, philo->id);
+	printf("%ld\t%d has taken a fork\n", current_milliseconds() - philo->table->time_start, philo->id);
+	pthread_mutex_unlock(&philo->table->print);
+	return (0);
+}
+
+void	leave_fork(t_philo *philo)
+{
+	pthread_mutex_unlock(&philo->table->fork[philo->fist_fork]);
+	pthread_mutex_unlock(&philo->table->fork[philo->sec_fork]);
+}
+
+void	print_eating(t_philo *philo, int id, char *status)
+{
+	pthread_mutex_lock(&philo->table->print);
+	philo->last_eat = current_milliseconds() - philo->table->time_start;
+	printf(YEL"%ld\t%d %s[before %ld][%d meals]\n"reset, philo->last_eat, id, status, philo->next_eat / 1000, philo->count_meals + 1);
+	philo->count_meals++;
+	pthread_mutex_unlock(&philo->table->print);
+	ft_usleep(philo->table->t_eat / 1000);
+	
+}
+
+int	eating(t_philo *philo)
 {
 	if (philo->id % 2 == 0)
 	{
-		pthread_mutex_lock(&philo->table->monitor);
-		dying(philo);
-		pthread_mutex_unlock(&philo->table->monitor);
-		usleep(100); // philoคู่จับช้ากว่า
-		pthread_mutex_lock(&philo->table->fork[philo->fist_fork]);
-		pthread_mutex_lock(&philo->table->fork[philo->sec_fork]);
-		pthread_mutex_lock(&philo->table->print);
-		printf("%ld\t%d has taken a fork\n", current_milliseconds() - philo->table->time_start, philo->id);
-		printf("%ld\t%d has taken a fork\n", current_milliseconds() - philo->table->time_start, philo->id);
-		philo->last_eat = current_milliseconds() - philo->table->time_start;
-		printf("%ld\t%d is eating [before %ld][%d meals]\n", philo->last_eat, philo->id, philo->next_eat / 1000, philo->count_meals + 1);
-		philo->count_meals++;
-		pthread_mutex_unlock(&philo->table->print);
-		usleep(philo->table->t_eat);
-		pthread_mutex_unlock(&philo->table->fork[philo->fist_fork]);
-		pthread_mutex_unlock(&philo->table->fork[philo->sec_fork]);
+		usleep(100); // id เลขคู่จับช้ากว่า
+		if (take_forks(philo, philo->fist_fork, philo->sec_fork) == 1)
+			return (1);
+		// pthread_mutex_lock(&philo->table->monitor);
+		// dying(philo);
+		// pthread_mutex_unlock(&philo->table->monitor);
 	}
 	else
 	{
-		pthread_mutex_lock(&philo->table->monitor);
-		dying(philo);
-		pthread_mutex_unlock(&philo->table->monitor);
-		pthread_mutex_lock(&philo->table->fork[philo->sec_fork]);
-		pthread_mutex_lock(&philo->table->fork[philo->fist_fork]);
-		pthread_mutex_lock(&philo->table->print);
-		printf("%ld\t%d has taken a fork\n", current_milliseconds() - philo->table->time_start, philo->id);
-		printf("%ld\t%d has taken a fork\n", current_milliseconds() - philo->table->time_start, philo->id);
-		philo->last_eat = current_milliseconds() - philo->table->time_start;
-		printf("%ld\t%d is eating [before %ld][%d meals]\n", philo->last_eat, philo->id, philo->next_eat / 1000, philo->count_meals + 1);
-		philo->count_meals++;
-		pthread_mutex_unlock(&philo->table->print);
-		usleep(philo->table->t_eat);
-		pthread_mutex_unlock(&philo->table->fork[philo->sec_fork]);
-		pthread_mutex_unlock(&philo->table->fork[philo->fist_fork]);
+		if (take_forks(philo, philo->sec_fork, philo->fist_fork) == 1)
+			return (1);
+		// dying(philo);
 	}
+	// philo->last_eat = current_milliseconds() - philo->table->time_start;
+	print_eating(philo, philo->id, "is eating");
+	// philo->last_eat = philo->last_eat + philo->table->t_eat / 1000;
+	// philo->next_eat = (philo->last_eat * 1000) + philo->table->t_die; 
+	philo->next_eat = (philo->last_eat * 1000) + philo->table->t_die; 
+	// philo->count_meals++;
+	leave_fork(philo);
+	usleep(100);
+	return (0);
 }
 
 void    *dining_room(void *data)
@@ -77,18 +147,29 @@ void    *dining_room(void *data)
 	philo = (t_philo *)data;
 	pthread_mutex_lock(&philo->table->monitor);
 	if (philo->table->time_start == 0) // ให้ตั้งค่าแค่ครั้งเดียว
-    	philo->table->time_start = current_milliseconds();
+		philo->table->time_start = current_milliseconds();
 	pthread_mutex_unlock(&philo->table->monitor);
-	philo->next_eat = philo->last_eat + philo->table->t_die;
+	// int i = -1;//ใส่monitor เช็คใน while ด้วย (philo->table->end)
+	while (1)
+	{
+		philo->next_eat = (philo->last_eat * 1000) + philo->table->t_die; 
+		// pthread_mutex_lock(&philo->table->print);
+		// printf("[THREAD %d] %ld + %ld = %ld\n", philo->id, philo->last_eat, philo->table->t_die, philo->next_eat);
+		// pthread_mutex_unlock(&philo->table->print);
 	/*eat*/
-	eating(philo);
+		if (eating(philo) == 1)
+			return (NULL);// break
+		// pthread_mutex_lock(&philo->table->monitor);
+		// dying(philo);
+		// pthread_mutex_unlock(&philo->table->monitor);
 	/*sleep*/
-	// sleeping(philo);
-	/*tjink*/
-	// pthread_mutex_lock(&philo->table->print);
-	// printf("%ld\t%d is thinking\n", current_milliseconds() - philo->table->time_start, philo->id);
-	// pthread_mutex_unlock(&philo->table->print);
-
+		if (sleeping(philo) == 1)
+			return (NULL);// break
+	/*think*/
+		if (thinking(philo) == 1)
+			return (NULL);// break
+	}
+	
 	return (NULL);
 }
 

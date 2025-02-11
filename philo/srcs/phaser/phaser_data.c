@@ -20,9 +20,10 @@ void    phaser_data(t_table *table, int i)
     table->fork = (t_mtx *)malloc(sizeof(t_mtx) * table->amount);
     //
     //
+    pthread_mutex_init(&table->lock, NULL);
     pthread_mutex_init(&table->monitor, NULL);
     pthread_mutex_init(&table->print, NULL);
-    table->end = false;
+    table->end = true;
     while (i < table->amount)
     {
         pthread_mutex_init(&table->fork[i], NULL);
@@ -32,6 +33,7 @@ void    phaser_data(t_table *table, int i)
         table->philo[i].count_meals = 0;
         table->philo[i].next_eat = 0;
         table->philo[i].last_eat = 0;
+        table->philo[i].life = true;
         table->philo[i].table = table;
         i++;
     }

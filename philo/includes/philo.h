@@ -20,6 +20,10 @@
 # include <sys/time.h>
 # include <pthread.h>
 
+#define GRN "\e[0;32m"
+#define YEL "\e[0;33m"
+#define BLU "\e[0;34m"
+
 #define BRED "\e[1;31m"
 #define BBLK "\e[1;30m"
 #define BCYN "\e[1;36m"
@@ -45,6 +49,7 @@ typedef struct s_philo
 	int		count_meals;// จำนวนมื้ออาหารที่กิน
 	long	next_eat;// เวลาที่ต้องกินภายในเวลานั้น
 	long	last_eat;// เวลาครั้งสุดท้ายที่กิน
+	bool	life;
 	t_ptd	threads;// เธรดของนักปรัชญา
 	t_table	*table;// ข้อมูลที่ใช้ร่วมกัน
 }	t_philo;// ข้อมูลของนักปรัชญา
@@ -58,6 +63,7 @@ typedef struct s_table
 	long	option;// จำนวนมื้ออาหารที่ต้องกินให้ครบก่อนอย่างน้อยก่อนการจำลองจะหยุด
 	long	time_start;// เวลาเริ่มการจำลอง
 	bool	end;// เช็คการจบการจำลอง
+	t_mtx	lock;
 	t_mtx	monitor;// เช็คสถานะคนตาย
 	t_mtx	print;// เขียนสถานะ กิน,นอน,คิด,ตาย
 	t_mtx	*fork;// arrayของส้อม
